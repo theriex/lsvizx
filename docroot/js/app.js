@@ -13,10 +13,20 @@ app = (function () {
         dispid = "";
 
 
-    function apikey (event) {
+    function apitoken (event) {
         jt.evtend(event);
-        lsat = jt.byId("apikeyin").value;
+        lsat = jt.byId("apitokenin").value;
+        jt.cookie("lsapitoken", lsat);  //use token to preserve state
         app.update();
+    }
+
+
+    function cleartoken (event) {
+        jt.evtend(event);
+        if(confirm("Clear API token and remove cookie?")) {
+            lsat = null;
+            jt.cookie("lsapitoken", "", -1);
+            updateDisplay(); }
     }
 
 
@@ -72,7 +82,6 @@ app = (function () {
             return; }
         sortEntities(des);
         des.forEach(function (ent) {
-            ent.id = String(ent.id);  //verify string key
             html.push(["div", {cla: "namedispdiv"},
                        [["a", {href:"#" + ent.id,
                                onclick:jt.fs("app.dispent('" + ent.id + "')"),
@@ -86,6 +95,38 @@ app = (function () {
     }
 
 
+    function cacheEntity (ent, callsrc) {
+        var cv, prios = ["search", "relationships", "details"];
+        //Will probably get string ids back to avoid exceeding javascript
+        //integer values, but verify here just to enforce as a standard.
+        ent.id = String(ent.id);
+        cv = entities[ent.id];
+        //Prioritized overwrites don't lose information. 
+        if(!cv || (prios.indexOf(callsrc) > prios.indexOf(cv.callsrc))) {
+            entities[ent.id] = ent; }
+    }
+
+
+    function foundEntities (sval) {
+        var ents = [], eids = searches[sval] || [];
+        eids.forEach(function (eid) {
+            if(entities[eid]) {
+                ents.push(entities[eid]); }
+            else {
+                jt.log("Entity " + eid + " not found"); } });
+        return ents;
+    }
+
+
+    function saveFoundEntities (sval, res) {
+        var eids = [];
+        res.data.forEach(function (ent) {
+            cacheEntity(ent, "search");
+            eids.push(ent.id); });
+        searches[sval] = eids;
+    }
+
+
     function search (event) {
         var sval, noes = "No matching entities found";
         jt.evtend(event);
@@ -93,13 +134,13 @@ app = (function () {
         if(!sval) {
             return; }  //nothing to do
         if(searches[sval]) {
-            displayNames("detdiv", searches[sval].data, noes); }
+            displayNames("detdiv", foundEntities(sval), noes); }
         jt.log("searching for " + sval);
         var params = "lsat=" + lsat + "&qstr=" + jt.enc(sval);
         jt.call("GET", "lsesrch?" + params, null,
                 function (res) {
-                    searches[sval] = res;
-                    displayNames("detdiv", res.data, noes);
+                    saveFoundEntities(sval, res);
+                    displayNames("detdiv", foundEntities(sval), noes);
                     updateDisplay(); },
                 function (code, errtxt) {
                     jt.out("detdiv", "Search error " + code + ": " + errtxt); },
@@ -117,15 +158,23 @@ app = (function () {
 
     function showTools () {
         var html = [], buttons = {};
+        //API token entry prompt, or clear button
         if(!lsat) {
             buttons.api = true;
-            html.push(["div", {id:"apikeyindiv", cla:"tbdiv"},
-                       [["input", {type:"text", id:"apikeyin", size:26,
+            html.push(["div", {id:"apitokenindiv", cla:"tbdiv"},
+                       [["input", {type:"text", id:"apitokenin", size:26,
                                    placeholder:"LittleSis-API-Key",
                                    value:""}],
-                        ["button", {type:"button", id:"apikeybutton",
+                        ["button", {type:"button", id:"apitokenbutton",
                                     cla:"toolbutton"},
                          "Enable API"]]]); }
+        else {
+            buttons.xapi = true;
+            html.push(["div", {id:"clearapidiv", cla:"tbdiv"},
+                       [["input", {type:"checkbox", id:"apicb", value:"active",
+                                   checked:"checked"}],
+                        ["label", {fo:"apicb", cla:"cblabel"}, "API"]]]); }
+        //Search entities
         if(lsat) {
             buttons.search = true;
             html.push(["div", {id:"searchindiv", cla:"tbdiv"},
@@ -135,6 +184,7 @@ app = (function () {
                         ["a", {href:"#search", id:"searchbutton"},
                          ["img", {cla:"toolicon", 
                                   src:"img/search.png"}]]]]); }
+        //Download link
         if(lsat && (Object.keys(searches).length > 0 ||
                     Object.keys(entities).length > 0)) {
             buttons.download = true;
@@ -143,9 +193,12 @@ app = (function () {
                               download:"context.json"},
                         ["img", {cla:"toolicon", src:"img/download.png"}]]]); }
         jt.out("toolsdiv", jt.tac2html(html));
+        //Action connections
         if(buttons.api) {
-            jt.on("apikeyin", "change", apikey);
-            jt.on("apikeybutton", "click", apikey); }
+            jt.on("apitokenin", "change", apitoken);
+            jt.on("apitokenbutton", "click", apitoken); }
+        if(buttons.xapi) {
+            jt.on("apicb", "click", cleartoken); }
         if(buttons.search) {
             jt.on("srchin", "change", search);
             jt.on("searchbutton", "click", search); }
@@ -160,14 +213,11 @@ app = (function () {
     function rebuildDisplay () {
         var as;
         if(dispid) {
-            if(searches[dispid]) {
-                displayNames("detdiv", searches[dispid]); }
-            else if (entities[dispid]) {
-                displayEntityDetails(); } }
+            displayEntityDetails(entities[dispid]); }
         else {  //if no current entity, show whatever search results.
             as = Object.keys(searches);
             if(as.length) {
-                displayNames("detdiv", searches[as[0]].data); } }
+                displayNames("detdiv", foundEntities(as[0])); } }
         updateDisplay();
     }
 
@@ -189,8 +239,8 @@ app = (function () {
 
     function init () {
         jtminjsDecorateWithUtilities(jt);
+        lsat = jt.cookie("lsapitoken")
         showTools();
-        //load API key from cookie
         loadContextData();
     }
 
