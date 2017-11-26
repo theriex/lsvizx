@@ -1,0 +1,43 @@
+runtime: python27
+api_version: 1
+threadsafe: true
+
+handlers:
+######################################################################
+##  API:
+##  Most calls must pass the "lsat" param (LittleSis API Token)
+##
+######################################################################
+
+## Search for an entity by name
+## GET params: lsat, qstr
+- url: .*/lsesrch.*
+  script: src.py.lse.app
+
+
+######################################################################
+# General config
+
+## Structural static directories
+- url: .*/img/
+  static_dir: docroot/img/
+- url: .*/css/
+  static_dir: docroot/css/
+- url: .*/docs/
+  static_dir: docroot/docs/
+- url: .*/js/
+  static_dir: docroot/js/
+
+## The index page
+- url: /index.html
+  static_files: docroot/index.html
+  upload: docroot
+## Trap anything ending with a slash and send it to index.html since
+## there is no default processing to figure that out otherwise.
+- url: (.*)/
+  static_files: docroot/index.html
+  upload: docroot
+## Catchall is to look in docroot.
+- url: /
+  static_dir: docroot
+

@@ -1,0 +1,45 @@
+A:link {text-decoration:none; color:#84521a; }
+A:visited {text-decoration:none; color:#84521a; }
+A:active {text-decoration:none; color:#84521a; }
+A:hover {text-decoration:underline; color:#a05705; }
+
+html {
+  min-height: 100%; margin:0; padding:0;
+}
+
+body {
+  font-family: "Open Sans", "Verdana", "Arial", "Helvetica", sans-serif;
+  font-style:normal;
+  font-weight:normal;
+  font-size:large;
+  word-spacing:normal;
+  margin:0px;
+  color:#111111;
+  height: 100%;
+  background-image: url('../img/bgmain.png');
+  background-attachment: fixed;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+img { border:0px; vertical-align:middle; }
+
+button, .loginbutton, .formbutton, .filesellab { 
+  border:1px solid #271400; border-radius:5px; cursor:pointer;
+  background:#ffd2a4; box-shadow:1px 1px 1px #999999; }
+
+#lseouterdiv {}
+#lsecontentdiv {}
+#gvdiv {}
+#toolsdiv { background:#ccc; padding:5px; text-align:right; }
+#detdiv { padding:5px; background-image: url('../img/bleachscrub.png'); }
+
+.tbdiv { display:inline-block; }
+.toolbutton { max-height:24px; padding:1px 2px; margin:0px 3px; }
+.toolicon { max-width:24px; max-height:24px; padding:1px 2px; }
+
+.namedispdiv { margin:5px; padding:5px; 
+  background-image: url('../img/bleachscrub.png'); }
+.entorgspan { font-style:italic; }
+.entpersonspan {}
+.blurbspan { font-size:small; }
