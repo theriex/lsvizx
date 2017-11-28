@@ -46,12 +46,45 @@ class LSESearch(webapp2.RequestHandler):
             return
         result = lseapi_call(self, "search?q=" + qstr)
         if not result:
-            return;  # error already written
-        # result is an array of entities with reasonable working data for each
+            return  # error already written
+        # result holds array of entities with reasonable working data for each
         write_json_response(self, result)
 
 
-app = webapp2.WSGIApplication([('.*/lsesrch', LSESearch)], 
+class LSEDetails(webapp2.RequestHandler):
+    def get(self):
+        logging.info("LSEDetails called")
+        entid = self.request.get('entid')
+        if not entid:
+            self.error(400)
+            self.response.out.write("entity id (entid) required")
+            return
+        result = lseapi_call(self, entid + "?details=TRUE")
+        if not result:
+            return  # error already written
+        # result holds single entity
+        write_json_response(self, result)
+
+
+class LSERelationships(webapp2.RequestHandler):
+    def get(self):
+        logging.info("LSERelationships called")
+        entid = self.request.get('entid')
+        if not entid:
+            self.error(400)
+            self.response.out.write("entity id (entid) required")
+            return
+        result = lseapi_call(self, entid + "/relationships")
+        if not result:
+            return  # error already written
+        # result holds array of relationships
+        write_json_response(self, result)
+        
+
+
+app = webapp2.WSGIApplication([('.*/lsesrch', LSESearch),
+                               ('.*/lsedet', LSEDetails),
+                               ('.*/lserels', LSERelationships)], 
                               debug=True)
 
 

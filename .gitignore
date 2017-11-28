@@ -1,7 +1,4 @@
 *~
 .DS_Store
 *.pyc
-docroot/downloads
-src/build/module-source.js
-src/build/compiler-latest
-googlee*
+docroot/data

@@ -14,6 +14,15 @@ handlers:
 - url: .*/lsesrch.*
   script: src.py.lse.app
 
+## Fetch details for entity
+## GET params: lsat, entid
+- url: .*/lsedet.*
+  script: src.py.lse.app
+
+## Fetch relationships for entity
+## GET params: lsat, entid
+- url: .*/lserels.*
+  script: src.py.lse.app
 
 ######################################################################
 # General config

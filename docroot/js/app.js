@@ -1,4 +1,4 @@
-/*global window jtminjsDecorateWithUtilities */
+/*global window jtminjsDecorateWithUtilities confirm */
 /*jslint browser, multivar, white, fudge, for */
 
 var app = {};  //Global container for app level funcs and values
@@ -10,7 +10,8 @@ app = (function () {
     var lsat = null,
         searches = {},
         entities = {},
-        dispid = "";
+        dispid = "",
+        nodeids = [];
 
 
     function apitoken (event) {
@@ -26,7 +27,7 @@ app = (function () {
         if(confirm("Clear API token and remove cookie?")) {
             lsat = null;
             jt.cookie("lsapitoken", "", -1);
-            updateDisplay(); }
+            app.update("all"); }
     }
 
 
@@ -96,25 +97,30 @@ app = (function () {
 
 
     function cacheEntity (ent, callsrc) {
-        var cv, prios = ["search", "relationships", "details"];
-        //Will probably get string ids back to avoid exceeding javascript
-        //integer values, but verify here just to enforce as a standard.
+        var cv;
+        //Should get string ids back from server to avoid overflowing
+        //javascript integer values.  Verify here to enforce as a standard.
         ent.id = String(ent.id);
         cv = entities[ent.id];
-        //Prioritized overwrites don't lose information. 
-        if(!cv || (prios.indexOf(callsrc) > prios.indexOf(cv.callsrc))) {
+        //"search" and "details" have the same data.
+        if(!cv || callsrc !== "relationships") {
             entities[ent.id] = ent; }
     }
 
 
-    function foundEntities (sval) {
-        var ents = [], eids = searches[sval] || [];
+    function entIdArrayToEnts (eids) {
+        var ents = [];
         eids.forEach(function (eid) {
             if(entities[eid]) {
                 ents.push(entities[eid]); }
             else {
                 jt.log("Entity " + eid + " not found"); } });
         return ents;
+    }
+
+
+    function foundEntities (sval) {
+        return entIdArrayToEnts(searches[sval] || []);
     }
 
 
@@ -141,7 +147,7 @@ app = (function () {
                 function (res) {
                     saveFoundEntities(sval, res);
                     displayNames("detdiv", foundEntities(sval), noes);
-                    updateDisplay(); },
+                    app.update(); },
                 function (code, errtxt) {
                     jt.out("detdiv", "Search error " + code + ": " + errtxt); },
                 jt.semaphore("app.search"));
@@ -150,7 +156,7 @@ app = (function () {
 
     function getJSONDataURI () {
         var txt, ctx = { lsat:lsat, entities:entities, searches:searches,
-                         dispid:dispid }
+                         dispid:dispid, nodeids:nodeids };
         txt = JSON.stringify(ctx);
         return "data:text/plain;charset=utf-8," + encodeURIComponent(txt);
     }
@@ -205,60 +211,171 @@ app = (function () {
     }
 
 
-    function displayEntityDetails () {
-        jt.log("displayEntityDetails not implemented yet");
+    function toggleDisplay (divid) {
+        var div = jt.byId(divid);
+        if(div) {
+            if(div.style.display === "none") {
+                div.style.display = "block"; }
+            else {
+                div.style.display = "none"; } }
+    }
+
+
+    function getEntityDetailContentHTML (ent) {
+        var html = [], params;
+        if(!ent.attributes.types) {  //placeholder entity from relationships
+            params = "lsat=" + lsat + "&entid=" + ent.id;
+            jt.call("GET", "lsedet?" + params, null,
+                    function (res) {
+                        cacheEntity(res.data, "details");
+                        app.update("details"); },
+                    function (code, errtxt) {
+                        jt.out("edtcontdiv", "Detail fetch error " + code + 
+                               ": " + errtxt); },
+                    jt.semaphore("app.detailfetch"));
+            return ""; }
+        html.push(["div", {cla:"detsummarydiv"}, 
+                   ent.attributes.summary || ent.attributes.blurb || ""]);
+        html.push(["div", {cla:"detlslink"},
+                   [["span", {cla:"dettypesspan"},
+                     ent.attributes.types.join(", ")],
+                    "&nbsp;",
+                    ["a", {href:ent.links.self,
+                           onclick:jt.fs("window.open('" + ent.links.self + 
+                                         "')")},
+                     [["img", {src:"img/arrow12right.png"}],
+                      "more at LittleSis"]]]]);
+        return html;
+    }
+
+
+    function cacheRelationships (rels, ent) {
+        ent.rels = {inbound:[], outbound:[]};
+        rels.forEach(function (rel) {
+            var re = {}, des = rel.attributes.description.split("  ");
+            //Should get string ids back from server to avoid overflowing
+            //javascript integer values.  Verify here to enforce as a standard.
+            rel.id = String(rel.id);
+            rel.attributes.entity1_id = String(rel.attributes.entity1_id);
+            rel.attributes.entity2_id = String(rel.attributes.entity2_id);
+            if(rel.attributes.entity1_id === ent.id) {
+                re.id = rel.attributes.entity2_id;
+                re.attributes = {name:des[2],
+                                 blurb:rel.attributes.description2};
+                if(ent.rels.outbound.indexOf(re.id) < 0) {
+                    ent.rels.outbound.push(re.id); } }
+            else {
+                re.id = rel.attributes.entity1_id;
+                re.attributes = {name:des[0],
+                                 blurb:rel.attributes.description1};
+                if(ent.rels.inbound.indexOf(re.id) < 0) {
+                    ent.rels.inbound.push(re.id); } }
+            re.attributes.primary_ext = "Placeholder";
+            cacheEntity(re, "relationships"); });
+    }
+
+
+    function displayCachedRelationships (rels) {
+        displayNames("edcirdiv", entIdArrayToEnts(rels.inbound));
+        displayNames("edcordiv", entIdArrayToEnts(rels.outbound));
+    }
+
+
+    function displayRelationships (entid) {
+        var params, ent = entities[entid];
+        if(ent.rels) {
+            displayCachedRelationships(ent.rels);
+            return; }
+        if(ent.attributes.primary_ext === "Placeholder") {
+            return; }  //wait for details before fetching rels
+        params = "lsat=" + lsat + "&entid=" + entid;
+        jt.call("GET", "lserels?" + params, null,
+                function (res) {
+                    cacheRelationships(res.data, ent);
+                    app.update();  //rebuild download link content
+                    displayCachedRelationships(ent.rels); },
+                function (code, errtxt) {
+                    jt.err("Relationships load " + code + ": " + errtxt); },
+                jt.semaphore("app.relationships"));
+    }
+
+
+    function displayEntityDetails (entid) {
+        var html, ent = entities[entid];
+        dispid = entid;
+        if(nodeids.indexOf(entid) < 0) {
+            nodeids.push(entid); }
+        html = ["div", {id:"entdetdiv"},
+                [["div", {id:"edtdiv"},
+                  [["div", {id:"edtnamediv"},
+                    ["div", {id:"edtnamelinkdiv"},
+                     ["a", {href:"#" + entid,
+                            onclick:jt.fs("app.togdisp('edtcontdiv')"),
+                            title:"Toggle detail display"},
+                      ent.attributes.name]]],
+                   ["div", {id:"edtcontdiv", style:"display:none;"},
+                    getEntityDetailContentHTML(ent)]]],
+                 ["div", {id:"edcdiv"},
+                  [["div", {id:"inboundrelsdiv", cla:"relcoldiv"},
+                    [["div", {cla:"relcoltitlediv"}, "In Rels"],
+                     ["div", {cla:"relcolnamesdiv", id:"edcirdiv"}]]],
+                   ["div", {id:"outboundrelsdiv", cla:"relcoldiv"},
+                    [["div", {cla:"relcoltitlediv"}, "Out Rels"],
+                     ["div", {cla:"relcolnamesdiv", id:"edcordiv"}]]]]]]];
+        jt.out("detdiv", jt.tac2html(html));
+        displayRelationships(entid);
     }
 
 
     function rebuildDisplay () {
         var as;
+        jt.out("detdiv", "");  //clear any existing display
         if(dispid) {
-            displayEntityDetails(entities[dispid]); }
+            displayEntityDetails(dispid); }
         else {  //if no current entity, show whatever search results.
             as = Object.keys(searches);
             if(as.length) {
                 displayNames("detdiv", foundEntities(as[0])); } }
-        updateDisplay();
+        app.update();
     }
 
 
     function loadContextData () {
-        var ctx = null;
-        jt.call("GET", "data/context.json", null,
-                function (ld) {
-                    lsat = ld.lsat;
-                    searches = ld.searches;
-                    entities = ld.entities;
-                    dispid = ld.dispid;
-                    rebuildDisplay(); },
-                function (code, errtxt) {
-                    jt.log("data/context.json not loaded"); },
-                jt.semaphore("app.loadContextData"));
+        if(window.location.href.indexOf(":8080") > 0) {
+            jt.call("GET", "data/context.json", null,
+                    function (ld) {
+                        lsat = ld.lsat;
+                        searches = ld.searches || {};
+                        entities = ld.entities || {};
+                        dispid = ld.dispid || "";
+                        nodeids = ld.nodeids || [];
+                        rebuildDisplay(); },
+                    function (/*code, errtxt*/) {
+                        jt.log("data/context.json not loaded"); },
+                    jt.semaphore("app.loadContextData")); }
     }
 
 
     function init () {
         jtminjsDecorateWithUtilities(jt);
-        lsat = jt.cookie("lsapitoken")
+        lsat = jt.cookie("lsapitoken");
         showTools();
         loadContextData();
     }
 
 
-    function updateDisplay () {
+    function updateDisplay (area) {
         showTools();
-    }
-
-
-    function displayEntity (entid) {
-        jt.log("displayEntity not implemented yet");
+        if(area === "details" || area === "all") {
+            rebuildDisplay(); }
     }
 
 
 return {
     init: function () { init(); },
-    update: function () { updateDisplay(); },
-    dispent: function (entid) { displayEntity(entid); }
+    update: function (area) { updateDisplay(area); },
+    dispent: function (entid) { displayEntityDetails(entid); },
+    togdisp: function (divid) { toggleDisplay(divid); }
 };
 }());
 

@@ -1,7 +1,7 @@
-A:link {text-decoration:none; color:#84521a; }
-A:visited {text-decoration:none; color:#84521a; }
-A:active {text-decoration:none; color:#84521a; }
-A:hover {text-decoration:underline; color:#a05705; }
+A:link {text-decoration:none; color:#5c1398; }
+A:visited {text-decoration:none; color:#5c1398; }
+A:active {text-decoration:none; color:#5c1398; }
+A:hover {text-decoration:underline; color:#8c00ff; }
 
 html {
   min-height: 100%; margin:0; padding:0;
@@ -32,7 +32,8 @@ button, .loginbutton, .formbutton, .filesellab {
 #lsecontentdiv {}
 #gvdiv {}
 #toolsdiv { background:#ccc; padding:5px; text-align:right; }
-#detdiv { padding:5px; background-image: url('../img/bleachscrub.png'); }
+/* no background at this top level. allow for space within elements */
+#detdiv { padding:5px; }
 
 .tbdiv { display:inline-block; }
 .toolbutton { max-height:24px; padding:1px 2px; margin:0px 3px; }
@@ -44,3 +45,21 @@ button, .loginbutton, .formbutton, .filesellab {
 .entpersonspan {}
 .blurbspan { font-size:small; }
 .cblabel { font-size:small; padding-right:5px; }
+
+#entdetdiv {}
+#edtdiv { margin-bottom:5px; }
+#edtnamediv { font-size:x-large; font-style:bold; text-align:center; }
+#edtnamelinkdiv { display:inline-block; padding:0px 5px;
+  border-radius:10px 10px 0 0;
+  background-image: url('../img/bleachscrub.png'); }
+#edtcontdiv { background-image: url('../img/bleachscrub.png'); }
+.detsummarydiv { font-size:small; padding:0px 10px; }
+.detlslink { font-size:small; padding:10px; }
+.dettypesspan { font-size:small; font-style:italic; }
+
+#edcdiv { padding-top:5px; }
+.relcoldiv { display:inline-block; min-width:50%; max-width:50%; }
+/* have to float the left column so it aligns vertically with the right */
+#inboundrelsdiv { float:left; }
+#outboundrelsdiv { float:right; }
+.relcoltitlediv { text-align:center; color:#666; font-size:small; }
