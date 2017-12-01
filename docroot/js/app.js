@@ -1,4 +1,4 @@
-/*global window jtminjsDecorateWithUtilities confirm */
+/*global window jtminjsDecorateWithUtilities confirm d3 */
 /*jslint browser, multivar, white, fudge, for */
 
 var app = {};  //Global container for app level funcs and values
@@ -11,7 +11,8 @@ app = (function () {
         searches = {},
         entities = {},
         dispid = "",
-        nodeids = [];
+        nodeids = [],
+        vc = {};  //visualization chart vars
 
 
     function apitoken (event) {
@@ -263,21 +264,25 @@ app = (function () {
                 re.attributes = {name:des[2],
                                  blurb:rel.attributes.description2};
                 if(ent.rels.outbound.indexOf(re.id) < 0) {
-                    ent.rels.outbound.push(re.id); } }
+                    ent.rels.outbound.push({entid:re.id, 
+                                            desc:re.attributes.blurb}); } }
             else {
                 re.id = rel.attributes.entity1_id;
                 re.attributes = {name:des[0],
                                  blurb:rel.attributes.description1};
                 if(ent.rels.inbound.indexOf(re.id) < 0) {
-                    ent.rels.inbound.push(re.id); } }
+                    ent.rels.inbound.push({entid:re.id, 
+                                           desc:re.attributes.blurb}); } }
             re.attributes.primary_ext = "Placeholder";
             cacheEntity(re, "relationships"); });
     }
 
 
     function displayCachedRelationships (rels) {
-        displayNames("edcirdiv", entIdArrayToEnts(rels.inbound));
-        displayNames("edcordiv", entIdArrayToEnts(rels.outbound));
+        displayNames("edcirdiv", entIdArrayToEnts(
+            rels.inbound.map(function (rel) { return rel.entid; })));
+        displayNames("edcordiv", entIdArrayToEnts(
+            rels.outbound.map(function (rel) { return rel.entid; })));
     }
 
 
@@ -303,6 +308,7 @@ app = (function () {
     function displayEntityDetails (entid) {
         var html, ent = entities[entid];
         dispid = entid;
+        ent.lastviewed = Date.now();  //used for heat chromacoding
         if(nodeids.indexOf(entid) < 0) {
             nodeids.push(entid); }
         html = ["div", {id:"entdetdiv"},
@@ -327,9 +333,159 @@ app = (function () {
     }
 
 
+    function shortname (node) {
+        var sn = node.attributes.name || "unknown";
+        sn = sn.replace(/Political Action Committee/ig, "PAC");
+        return sn;
+    }
+
+
+    function findRelationship (src, trg, dir) {
+        var rel, lm;
+        if(src === trg || !src.rels || !src.rels[dir]) {
+            return null; }
+        rel = src.rels[dir].find(function (rel) {
+            return rel.entid === trg.id; });
+        if(rel) {
+            if(dir === "outbound") {
+                lm = "-[o:" + rel.desc + "]>"; }
+            else { //(dir === "inbound")
+                lm = "<[i:" + rel.desc + "]-"; }
+            jt.log(src.id + "(" + shortname(src) + ") " + lm + " " + 
+                   trg.id + "(" + shortname(trg) + ")"); }
+        return rel;
+    }
+
+
+    function rebuildChartData () {
+        vc.dat = {nodes:[], links:[]};
+        nodeids.forEach(function (nodeid) {
+            //nodes are color coded red to black based on lastviewed recency
+            var node = entities[nodeid];
+            jt.log("node: " + nodeid + "(" + shortname(node) + ")");
+            vc.dat.nodes.push(entities[nodeid]); });
+        vc.dat.nodes.forEach(function (src) {
+            vc.dat.nodes.forEach(function (trg) {
+                var rel = findRelationship(src, trg, "outbound");
+                if(rel) {
+                    vc.dat.links.push({source:src.id, target:trg.id,
+                                       value:1, desc:rel.desc}); }
+                rel = findRelationship(src, trg, "inbound");
+                if(rel) {
+                    vc.dat.links.push({source:trg.id, target:src.id,
+                                       value:1, desc:rel.desc}); } }); });
+    }
+
+
+    function calcChartHeight () {
+        var maxh = Math.round(0.5 * window.innerHeight),
+            linec = Math.round(nodeids.length / 3) + 1,
+            lineh = 40;  //min line height in px
+        return Math.min(maxh, linec * lineh);
+    }
+
+
+    function ticked () {
+        vc.link
+            .attr("x1", function (d) { return d.source.x; })
+            .attr("y1", function (d) { return d.source.y; })
+            .attr("x2", function (d) { return d.target.x; })
+            .attr("y2", function (d) { return d.target.y; });
+        vc.node
+            .attr("cx", function (d) { return d.x; })
+            .attr("cy", function (d) { return d.y; });
+    }
+
+
+    function dragstarted (d) {
+        if(!d3.event.active) {
+            vc.sim.alphaTarget(0.3).restart(); }
+        d.fx = d.x;
+        d.fy = d.y;
+    }
+
+
+    function dragged (d) {
+        d.fx = d3.event.x;
+        d.fy = d3.event.y;
+    }
+
+
+    function dragended (d) {
+        if(!d3.event.active) {
+            vc.sim.alphaTarget(0); }
+        d.fx = null;
+        d.fy = null;
+    }
+
+
+    function drawChartElements () {
+        vc.link = vc.svg.append("g")
+            .attr("class", "links")
+            .selectAll("line")
+            .data(vc.dat.links)
+            .enter().append("line")
+        //using the square root lets the lines get thicker as the values
+        //increase, but without getting too thick.
+            .attr("stroke-width", function (d) { return Math.sqrt(d.value); });
+        vc.node = vc.svg.append("g")
+            .attr("class", "nodes")
+            .selectAll("circle")
+            .data(vc.dat.nodes)
+            .enter().append("circle")
+            .attr("r", 5)
+            .attr("fill", function (d) { return vc.color(d.lastviewed); })
+            .call(d3.drag()
+                  .on("start", dragstarted)
+                  .on("drag", dragged)
+                  .on("end", dragended))
+            .on("click", function (d) { 
+                dispid = d.id;
+                d.lastviewed = Date.now();  //used for heat chromacoding
+                app.update("all"); });
+        vc.node.append("title")
+            .text(function (d) { return shortname(d); });
+        vc.sim.nodes(vc.dat.nodes).on("tick", ticked);
+        vc.sim.force("link").links(vc.dat.links);
+    }
+
+
+    function displayChart () {
+        if(!nodeids || nodeids.length < 2) {
+            return; }  //must have at least two connected points
+        vc.dims = {w:window.innerWidth, h:calcChartHeight()};
+        jt.out("vcdiv", jt.tac2html(
+            ["svg", {id:"vcsvg", width:vc.dims.w, height:vc.dims.h}]));
+        vc.svg = d3.select("svg");
+        vc.color = d3.scaleLinear()
+            .domain(d3.extent(entIdArrayToEnts(nodeids), function (d) {
+                return d.lastviewed; }))
+            .interpolate(d3.interpolateHcl)
+            .range([d3.rgb("#330000"), d3.rgb("#FF0000")]);
+        vc.sim = d3.forceSimulation()
+            .force("link", d3.forceLink().id(function(d) { return d.id; }))
+            .force("charge", d3.forceManyBody())
+            .force("center", d3.forceCenter(vc.dims.w / 2, vc.dims.h / 2));
+        drawChartElements();
+    }
+
+
+    function createChart () {
+        rebuildChartData();
+        displayChart();
+    }
+
+
     function rebuildDisplay () {
         var as;
-        jt.out("detdiv", "");  //clear any existing display
+        //It's a lot of computer work to recreate the display from scratch,
+        //but rebuilding provides some display consistency when returning to
+        //a visualization later.  If the display were built additively, a
+        //rebuild later could likely cause layout change annoyance.
+        jt.out("vcdiv", "");  //clear any existing visualization chart
+        if(nodeids.length) {
+            createChart(); }
+        jt.out("detdiv", "");  //clear any existing details display
         if(dispid) {
             displayEntityDetails(dispid); }
         else {  //if no current entity, show whatever search results.
@@ -378,5 +534,4 @@ return {
     togdisp: function (divid) { toggleDisplay(divid); }
 };
 }());
-
 

@@ -30,7 +30,7 @@ button, .loginbutton, .formbutton, .filesellab {
 
 #lseouterdiv {}
 #lsecontentdiv {}
-#gvdiv {}
+#vcdiv {}
 #toolsdiv { background:#ccc; padding:5px; text-align:right; }
 /* no background at this top level. allow for space within elements */
 #detdiv { padding:5px; }
@@ -63,3 +63,6 @@ button, .loginbutton, .formbutton, .filesellab {
 #inboundrelsdiv { float:left; }
 #outboundrelsdiv { float:right; }
 .relcoltitlediv { text-align:center; color:#666; font-size:small; }
+
+.links line { stroke:#999; stroke-opacity:0.6; }
+.nodes circle {stroke:#fff; stroke-width:1.5px; }
