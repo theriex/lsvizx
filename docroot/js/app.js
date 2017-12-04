@@ -175,7 +175,7 @@ app = (function () {
             buttons.api = true;
             html.push(["div", {id:"apitokenindiv", cla:"tbdiv"},
                        [["input", {type:"text", id:"apitokenin", size:26,
-                                   placeholder:"LittleSis-API-Key",
+                                   placeholder:"LittleSis-API-Token",
                                    value:""}],
                         ["button", {type:"button", id:"apitokenbutton",
                                     cla:"toolbutton"},
@@ -239,7 +239,8 @@ app = (function () {
                         app.update("details"); },
                     function (code, errtxt) {
                         jt.out("edtcontdiv", "Detail fetch error " + code + 
-                               ": " + errtxt); },
+                               ": " + errtxt);
+                        jt.byId("edtcontdiv").style.display = "block"; },
                     jt.semaphore("app.detailfetch"));
             return ""; }
         html.push(["div", {cla:"detsummarydiv"}, 
@@ -257,29 +258,53 @@ app = (function () {
     }
 
 
+    function parseNamesFromDesc (rel) {
+        //The description is constructed automatically by the API, and the
+        //components of the description are very helpfully delimited by a
+        //double space.  This is not visible in html, but it helps
+        //enormously when dealing with raw JSON text values.
+        var names = {}, des = rel.attributes.description.split("  ");
+        // var stopids = ["257422"];
+        // if((stopids.indexOf(rel.id) >= 0) ||
+        //    (stopids.indexOf(rel.attributes.entity1_id) >= 0) ||
+        //    (stopids.indexOf(rel.attributes.entity2_id) >= 0)) {
+        //     jt.err("parseNamesFromDesc stopid found"); }
+        names.inbound = des[0];
+        names.outbound = des[2];
+        if(names.outbound.indexOf(") at") >= 0 && des.length >= 4) {
+            names.outbound = des[3]; }
+        return names;
+    }
+
+
     function cacheRelationships (rels, ent) {
         ent.rels = {inbound:[], outbound:[]};
         rels.forEach(function (rel) {
-            var re = {}, des = rel.attributes.description.split("  ");
+            var re = {}, relnames;
             //Should get string ids back from server to avoid overflowing
             //javascript integer values.  Verify here to enforce as a standard.
             rel.id = String(rel.id);
             rel.attributes.entity1_id = String(rel.attributes.entity1_id);
             rel.attributes.entity2_id = String(rel.attributes.entity2_id);
+            relnames = parseNamesFromDesc(rel);
             if(rel.attributes.entity1_id === ent.id) {
                 re.id = rel.attributes.entity2_id;
-                re.attributes = {name:des[2],
+                re.attributes = {name:relnames.outbound,
                                  blurb:(rel.attributes.description2 ||
-                                        rel.attributes.description1)};
-                if(ent.rels.outbound.indexOf(re.id) < 0) {
+                                        rel.attributes.description1 ||
+                                        rel.attributes.description)};
+                if(!ent.rels.outbound.find(function (existing) {
+                    return existing.entid === re.id; })) {
                     ent.rels.outbound.push({entid:re.id, relid:rel.id,
                                             desc:re.attributes.blurb}); } }
             else {
                 re.id = rel.attributes.entity1_id;
-                re.attributes = {name:des[0],
+                re.attributes = {name:relnames.inbound,
                                  blurb:(rel.attributes.description1 ||
-                                        rel.attributes.description2)};
-                if(ent.rels.inbound.indexOf(re.id) < 0) {
+                                        rel.attributes.description2 ||
+                                        rel.attributes.description)};
+                if(!ent.rels.inbound.find(function (existing) {
+                    return existing.entid === re.id; })) {
                     ent.rels.inbound.push({entid:re.id, relid:rel.id,
                                            desc:re.attributes.blurb}); } }
             re.attributes.primary_ext = "Placeholder";
@@ -324,10 +349,11 @@ app = (function () {
                 [["div", {id:"edtdiv"},
                   [["div", {id:"edtnamediv"},
                     ["div", {id:"edtnamelinkdiv"},
-                     ["a", {href:"#" + entid,
-                            onclick:jt.fs("app.togdisp('edtcontdiv')"),
-                            title:"Toggle detail display"},
-                      ent.attributes.name]]],
+                     [["a", {href:"#" + entid,
+                             onclick:jt.fs("app.togdisp('edtcontdiv')"),
+                             title:"Toggle detail display"},
+                       ent.attributes.name],
+                      ["span", {id:"detxspan"}]]]],
                    ["div", {id:"edtcontdiv", style:"display:none;"},
                     getEntityDetailContentHTML(ent)]]],
                  ["div", {id:"edcdiv"},
@@ -338,31 +364,29 @@ app = (function () {
                     [["div", {cla:"relcoltitlediv"}, "Out Rels"],
                      ["div", {cla:"relcolnamesdiv", id:"edcordiv"}]]]]]]];
         jt.out("detdiv", jt.tac2html(html));
+        if(nodeids.length > 2) {
+            jt.out("detxspan", jt.tac2html(
+                ["&nbsp;",
+                 ["a", {href:"#remove", 
+                        onclick:jt.fs("app.undisp('" + entid + "')")},
+                  ["img", {src:"img/trash.png", cla:"noderemoveimg"}]]])); }
         displayRelationships(entid);
     }
 
 
     function shortname (node) {
         var sn = node.attributes.name || "unknown";
-        sn = sn.replace(/Political Action Committee/ig, "PAC");
+        sn = sn.replace(/Political\sAction\sCommittee/ig, "PAC");
         return sn;
     }
 
 
     function findRelationship (src, trg, dir) {
-        var rel, lm;
+        var rel;
         if(src === trg || !src.rels || !src.rels[dir]) {
             return null; }
         rel = src.rels[dir].find(function (rel) {
             return rel.entid === trg.id; });
-        if(rel) {
-            if(dir === "outbound") {
-                lm = "-[o:" + rel.desc + "]>"; }
-            else { //(dir === "inbound")
-                lm = "<[i:" + rel.desc + "]-"; }
-            //jt.log(src.id + "(" + shortname(src) + ") " + lm + " " + 
-            //       trg.id + "(" + shortname(trg) + ")"); 
-        }
         return rel;
     }
 
@@ -371,8 +395,6 @@ app = (function () {
         vc.dat = {nodes:[], links:[]};
         nodeids.forEach(function (nodeid) {
             //nodes are color coded red to black based on lastviewed recency
-            var node = entities[nodeid];
-            //jt.log("node: " + nodeid + "(" + shortname(node) + ")");
             vc.dat.nodes.push(entities[nodeid]); });
         vc.dat.nodes.forEach(function (src) {
             vc.dat.nodes.forEach(function (trg) {
@@ -391,7 +413,11 @@ app = (function () {
 
     function calcChartHeight () {
         var maxh = Math.round(0.5 * window.innerHeight),
-            linec = Math.round(nodeids.length / 3) + 1,
+            //figure a logical "lines" count based on how many nodes can
+            //coexist comfortably next to each other in the display.
+            //Started out at 3, but relationship descriptions can get quite
+            //long, which requires more vertical space to be legible.
+            linec = Math.round(nodeids.length / 2) + 1,
             lineh = 50;  //min line height in px
         return Math.min(maxh, linec * lineh);
     }
@@ -605,11 +631,21 @@ app = (function () {
     }
 
 
+    function removeEntityFromDisplay (entid) {
+        var idx = nodeids.indexOf(entid);
+        if(idx >= 0) {
+            nodeids.splice(idx, 1); }
+        dispid = nodeids[0];
+        rebuildDisplay();
+    }
+
+
 return {
     init: function () { init(); },
     update: function (area) { updateDisplay(area); },
     dispent: function (entid) { displayEntityDetails(entid); },
-    togdisp: function (divid) { toggleDisplay(divid); }
+    togdisp: function (divid) { toggleDisplay(divid); },
+    undisp: function (entid) { removeEntityFromDisplay(entid); }
 };
 }());
 
