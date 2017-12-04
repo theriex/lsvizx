@@ -30,7 +30,7 @@ button, .loginbutton, .formbutton, .filesellab {
 
 #lseouterdiv {}
 #lsecontentdiv {}
-#vcdiv {}
+#vcdiv { background-image: url('../img/darkwash.png'); }
 #toolsdiv { background:#ccc; padding:5px; text-align:right; }
 /* no background at this top level. allow for space within elements */
 #detdiv { padding:5px; }
@@ -64,5 +64,7 @@ button, .loginbutton, .formbutton, .filesellab {
 #outboundrelsdiv { float:right; }
 .relcoltitlediv { text-align:center; color:#666; font-size:small; }
 
-.links line { stroke:#999; stroke-opacity:0.6; }
+.links line { stroke:#999; stroke-opacity:0.8; }
 .nodes circle {stroke:#fff; stroke-width:1.5px; }
+.linklabel { fill:#999; font-size:14px; text-anchor:end; }
+.nodelabel { fill:#c66; font-size:12px; text-anchor:start; }

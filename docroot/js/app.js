@@ -156,7 +156,12 @@ app = (function () {
 
 
     function getJSONDataURI () {
-        var txt, ctx = { lsat:lsat, entities:entities, searches:searches,
+        //Need LittleSis API Token to start and show appropriate tools, but
+        //context.json file may be shared or used for other purposes where
+        //it is not appropriate to be sharing the token.  Compromise is to
+        //set it to a known anonymous value here.  Easy to find and edit in
+        //the resulting file if needed.
+        var txt, ctx = { lsat:"xxxx", entities:entities, searches:searches,
                          dispid:dispid, nodeids:nodeids };
         txt = JSON.stringify(ctx);
         return "data:text/plain;charset=utf-8," + encodeURIComponent(txt);
@@ -262,16 +267,18 @@ app = (function () {
             if(rel.attributes.entity1_id === ent.id) {
                 re.id = rel.attributes.entity2_id;
                 re.attributes = {name:des[2],
-                                 blurb:rel.attributes.description2};
+                                 blurb:(rel.attributes.description2 ||
+                                        rel.attributes.description1)};
                 if(ent.rels.outbound.indexOf(re.id) < 0) {
-                    ent.rels.outbound.push({entid:re.id, 
+                    ent.rels.outbound.push({entid:re.id, relid:rel.id,
                                             desc:re.attributes.blurb}); } }
             else {
                 re.id = rel.attributes.entity1_id;
                 re.attributes = {name:des[0],
-                                 blurb:rel.attributes.description1};
+                                 blurb:(rel.attributes.description1 ||
+                                        rel.attributes.description2)};
                 if(ent.rels.inbound.indexOf(re.id) < 0) {
-                    ent.rels.inbound.push({entid:re.id, 
+                    ent.rels.inbound.push({entid:re.id, relid:rel.id,
                                            desc:re.attributes.blurb}); } }
             re.attributes.primary_ext = "Placeholder";
             cacheEntity(re, "relationships"); });
@@ -351,8 +358,9 @@ app = (function () {
                 lm = "-[o:" + rel.desc + "]>"; }
             else { //(dir === "inbound")
                 lm = "<[i:" + rel.desc + "]-"; }
-            jt.log(src.id + "(" + shortname(src) + ") " + lm + " " + 
-                   trg.id + "(" + shortname(trg) + ")"); }
+            //jt.log(src.id + "(" + shortname(src) + ") " + lm + " " + 
+            //       trg.id + "(" + shortname(trg) + ")"); 
+        }
         return rel;
     }
 
@@ -362,18 +370,20 @@ app = (function () {
         nodeids.forEach(function (nodeid) {
             //nodes are color coded red to black based on lastviewed recency
             var node = entities[nodeid];
-            jt.log("node: " + nodeid + "(" + shortname(node) + ")");
+            //jt.log("node: " + nodeid + "(" + shortname(node) + ")");
             vc.dat.nodes.push(entities[nodeid]); });
         vc.dat.nodes.forEach(function (src) {
             vc.dat.nodes.forEach(function (trg) {
                 var rel = findRelationship(src, trg, "outbound");
                 if(rel) {
                     vc.dat.links.push({source:src.id, target:trg.id,
-                                       value:1, desc:rel.desc}); }
+                                       value:1, desc:rel.desc, 
+                                       relid:rel.relid}); }
                 rel = findRelationship(src, trg, "inbound");
                 if(rel) {
                     vc.dat.links.push({source:trg.id, target:src.id,
-                                       value:1, desc:rel.desc}); } }); });
+                                       value:1, desc:rel.desc,
+                                       relid:rel.relid}); } }); });
     }
 
 
@@ -385,15 +395,32 @@ app = (function () {
     }
 
 
+    function linemid (d, c) {
+        var a = d.source[c],
+            b = d.target[c],
+            mid = Math.round((a + b) / 2);
+        if(c === "y") {
+            mid += 6; }
+        return mid;
+    }
+
+
     function ticked () {
         vc.link
             .attr("x1", function (d) { return d.source.x; })
             .attr("y1", function (d) { return d.source.y; })
             .attr("x2", function (d) { return d.target.x; })
             .attr("y2", function (d) { return d.target.y; });
+        vc.lls
+            .attr("x", function (d) { return linemid(d, "x"); })
+            .attr("y", function (d) { return linemid(d, "y"); });
         vc.node
             .attr("cx", function (d) { return d.x; })
             .attr("cy", function (d) { return d.y; });
+        vc.nls
+            .attr("x", function (d) { return d.x + 8; })
+            .attr("y", function (d) { return d.y + 4; });
+        //jt.log("ticked " + Date.now());
     }
 
 
@@ -419,7 +446,26 @@ app = (function () {
     }
 
 
+    function drawLabels () {
+        vc.nls = vc.svg.append("g")
+            .attr("class", "nodelabels")
+            .selectAll("#nodelabel")
+            .data(vc.dat.nodes)
+            .enter().append("text")
+            .attr("class", "nodelabel")
+            .text(function (d) { return shortname(d); });
+        vc.lls = vc.svg.append("g")
+            .attr("class", "linklabels")
+            .selectAll("#linklabel")
+            .data(vc.dat.links)
+            .enter().append("text")
+            .attr("class", "linklabel")
+            .text(function (d) { return d.desc || "----"; });
+    }
+
+
     function drawChartElements () {
+        drawLabels();
         vc.link = vc.svg.append("g")
             .attr("class", "links")
             .selectAll("line")
@@ -427,7 +473,8 @@ app = (function () {
             .enter().append("line")
         //using the square root lets the lines get thicker as the values
         //increase, but without getting too thick.
-            .attr("stroke-width", function (d) { return Math.sqrt(d.value); });
+            .attr("stroke-width", function (d) { 
+                return Math.sqrt(d.value) + 1; });
         vc.node = vc.svg.append("g")
             .attr("class", "nodes")
             .selectAll("circle")
