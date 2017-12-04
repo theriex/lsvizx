@@ -181,6 +181,8 @@ app = (function () {
                                     cla:"toolbutton"},
                          "Enable API"]]]); }
         else {
+            if(jt.byId("introtextdiv")) {
+                jt.out("detdiv", ""); }
             buttons.xapi = true;
             html.push(["div", {id:"clearapidiv", cla:"tbdiv"},
                        [["input", {type:"checkbox", id:"apicb", value:"active",
@@ -390,7 +392,7 @@ app = (function () {
     function calcChartHeight () {
         var maxh = Math.round(0.5 * window.innerHeight),
             linec = Math.round(nodeids.length / 3) + 1,
-            lineh = 40;  //min line height in px
+            lineh = 50;  //min line height in px
         return Math.min(maxh, linec * lineh);
     }
 
@@ -405,7 +407,11 @@ app = (function () {
     }
 
 
-    function ticked () {
+    function ticked () {  //reflect the force updated values in the display
+        vc.dat.nodes.forEach(function (node) {
+            if(node.poslocked) {
+                node.x = node.poslocked.x;
+                node.y = node.poslocked.y; } });
         vc.link
             .attr("x1", function (d) { return d.source.x; })
             .attr("y1", function (d) { return d.source.y; })
@@ -443,6 +449,10 @@ app = (function () {
             vc.sim.alphaTarget(0); }
         d.fx = null;
         d.fy = null;
+        if(!d.poslocked) {
+            d.poslocked = {x:d.x, y:d.y}; }
+        else {
+            d.poslocked = null; }
     }
 
 
@@ -559,8 +569,29 @@ app = (function () {
     }
 
 
+    function externalLinkClick (event) {
+        var src;
+        jt.evtend(event);
+        src = event.target || event.srcElement;
+        if(src) {
+            window.open(src.href); }
+    }
+
+
+    function externalizeLinks () {
+        var links = document.getElementsByTagName("a");
+        Array.prototype.forEach.call(links, function (link) {
+            var href = link.href;
+            if(href.indexOf("http") === 0 && 
+               (((href.indexOf("8080") < 0) && (href.indexOf("lsvizx") < 0)) ||
+                (href.indexOf("github") > 0))) {
+                jt.on(link, "click", externalLinkClick); } });
+    }
+
+
     function init () {
         jtminjsDecorateWithUtilities(jt);
+        externalizeLinks();
         lsat = jt.cookie("lsapitoken");
         showTools();
         loadContextData();

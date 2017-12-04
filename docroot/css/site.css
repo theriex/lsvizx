@@ -34,12 +34,16 @@ button, .loginbutton, .formbutton, .filesellab {
 #toolsdiv { background:#ccc; padding:5px; text-align:right; }
 /* no background at this top level. allow for space within elements */
 #detdiv { padding:5px; }
+#introtextdiv { max-width:300px; margin-left:auto; margin-right:auto;
+  padding:5px 20px; border-radius:10px;
+  background-image: url('../img/bleachscrub.png'); }
+#opensourcediv { padding-top:10px; text-align:center; font-size:small; }
 
 .tbdiv { display:inline-block; }
 .toolbutton { max-height:24px; padding:1px 2px; margin:0px 3px; }
 .toolicon { max-width:24px; max-height:24px; padding:1px 2px; }
 
-.namedispdiv { margin:5px; padding:5px; 
+.namedispdiv { margin:5px; padding:5px; font-size:medium; 
   background-image: url('../img/bleachscrub.png'); }
 .entorgspan { font-style:italic; }
 .entpersonspan {}
