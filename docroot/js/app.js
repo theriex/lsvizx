@@ -144,7 +144,7 @@ app = (function () {
             displayNames("detdiv", foundEntities(sval), noes); }
         jt.log("searching for " + sval);
         var params = "lsat=" + lsat + "&qstr=" + jt.enc(sval);
-        jt.call("GET", "lsesrch?" + params, null,
+        jt.call("GET", "api/lsesrch?" + params, null,
                 function (res) {
                     saveFoundEntities(sval, res);
                     displayNames("detdiv", foundEntities(sval), noes);
@@ -233,7 +233,7 @@ app = (function () {
         var html = [], params;
         if(!ent.attributes.types) {  //placeholder entity from relationships
             params = "lsat=" + lsat + "&entid=" + ent.id;
-            jt.call("GET", "lsedet?" + params, null,
+            jt.call("GET", "api/lsedet?" + params, null,
                     function (res) {
                         cacheEntity(res.data, "details");
                         app.update("details"); },
@@ -328,7 +328,7 @@ app = (function () {
         if(ent.attributes.primary_ext === "Placeholder") {
             return; }  //wait for details before fetching rels
         params = "lsat=" + lsat + "&entid=" + entid;
-        jt.call("GET", "lserels?" + params, null,
+        jt.call("GET", "api/lserels?" + params, null,
                 function (res) {
                     cacheRelationships(res.data, ent);
                     app.update();  //rebuild download link content
@@ -579,8 +579,23 @@ app = (function () {
     }
 
 
-    function loadContextData () {
-        if(window.location.href.indexOf(":8080") > 0) {
+    function checkConnectivity () {
+        jt.call("GET", "api/chkconn", null,
+                function (res) {
+                    var link = res.contacturl;
+                    jt.out("contactdiv", jt.tac2html(
+                        ["contact:",
+                         ["a", {href:link, onclick:jt.fs("window.open('" +
+                                                         link + "')")},
+                          link]])); },
+                function (code, errtxt) {
+                    jt.err("checkConnectivity " + code + ": " + errtxt); },
+                jt.semaphore("app.checkConnectivity"));
+    }
+
+
+    function loadContextData (loadstatic) {
+        if(loadstatic && window.location.href.indexOf(":8080") > 0) {
             jt.call("GET", "data/context.json", null,
                     function (ld) {
                         lsat = ld.lsat;
@@ -620,7 +635,8 @@ app = (function () {
         externalizeLinks();
         lsat = jt.cookie("lsapitoken");
         showTools();
-        loadContextData();
+        checkConnectivity();
+        loadContextData(false);  //true preloads static data for testing
     }
 
 

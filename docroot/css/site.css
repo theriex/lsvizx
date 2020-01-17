@@ -37,7 +37,8 @@ button, .loginbutton, .formbutton, .filesellab {
 #introtextdiv { max-width:300px; margin-left:auto; margin-right:auto;
   padding:5px 20px; border-radius:10px;
   background-image: url('../img/bleachscrub.png'); }
-#opensourcediv { padding-top:10px; text-align:center; font-size:small; }
+#opensourcediv, #contactdiv {
+  padding-top:10px; text-align:center; font-size:small; }
 
 .tbdiv { display:inline-block; }
 .toolbutton { max-height:24px; padding:1px 2px; margin:0px 3px; }
