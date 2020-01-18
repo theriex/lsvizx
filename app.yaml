@@ -8,6 +8,15 @@ handlers:
   redirect_http_response_code: 301
   script: auto
 
-- url: /.*
-  static_dir: docroot
+- url: /(.+)
+  static_files: docroot/\1
+  upload: docroot/(.+)
 
+- url: /
+  static_files: docroot/index.html
+  upload: docroot/index.html
+
+
+
+
+  
